@@ -1,5 +1,5 @@
 // ============================================================
-//  LabVault — Complete MongoDB Schema
+//  HealthScan — Refined Patient-Doctor MongoDB Schema
 //  MongoDB 6.0+
 //  Copy-paste into MongoDB Shell or Compass
 //  Run each block in order
@@ -8,23 +8,24 @@
 
 // ============================================================
 //  1. USERS
-//  Single collection for all roles (patient, pathology, doctor, admin)
+//  Single collection for core roles (patient, doctor)
 // ============================================================
 
 db.createCollection("users", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["email", "passwordHash", "role", "name", "lvId"],
+      required: ["email", "password", "role", "name", "lvId"],
       properties: {
         _id:           { bsonType: "objectId" },
         lvId:          { bsonType: "string" },      // Core system ID (e.g., LV-1234)
         email:         { bsonType: "string" },
         phone:         { bsonType: "string" },
-        passwordHash:  { bsonType: "string" },
-        role:          { enum: ["patient", "pathology", "doctor", "admin"] },
+        password:      { bsonType: "string" },
+        role:          { enum: ["patient", "doctor"] },
         name:          { bsonType: "string" },
         avatarUrl:     { bsonType: "string" },
+        status:        { enum: ["PENDING", "APPROVED", "REJECTED", "SUSPENDED"] },
         isActive:      { bsonType: "bool" },
         isVerified:    { bsonType: "bool" },
         lastLoginAt:   { bsonType: "date" },
@@ -55,7 +56,7 @@ db.createCollection("patientProfiles", {
         _id:                   { bsonType: "objectId" },
         userId:                { bsonType: "objectId" },   // ref: users._id (UNIQUE)
         dateOfBirth:           { bsonType: "date" },
-        gender:                { enum: ["male", "female", "other"] },
+        gender:                { enum: ["Male", "Female", "Other"] },
         bloodGroup:            { bsonType: "string" },     // "A+", "O-" etc.
         emergencyContactName:  { bsonType: "string" },
         emergencyContactPhone: { bsonType: "string" },
@@ -85,10 +86,9 @@ db.createCollection("doctorProfiles", {
         userId:             { bsonType: "objectId" },   // ref: users._id (UNIQUE)
         specialty:          { bsonType: "string" },     // "Cardiology", "General" etc.
         registrationNumber: { bsonType: "string" },     // MCI / state council (UNIQUE)
-        clinicName:         { bsonType: "string" },
-        clinicAddress:      { bsonType: "string" },
-        isVerified:         { bsonType: "bool" },       // admin manually verifies
-        isErDoctor:         { bsonType: "bool" },       // unlocks emergency override
+        hospitalName:       { bsonType: "string" },
+        licenseCertificateUrl: { bsonType: "string" },
+        isVerified:         { bsonType: "bool" },       
         createdAt:          { bsonType: "date" },
         updatedAt:          { bsonType: "date" }
       }
@@ -98,46 +98,10 @@ db.createCollection("doctorProfiles", {
 
 db.doctorProfiles.createIndex({ userId: 1 }, { unique: true });
 db.doctorProfiles.createIndex({ registrationNumber: 1 }, { unique: true });
-db.doctorProfiles.createIndex({ isVerified: 1 });
 
 
 // ============================================================
-//  4. PATHOLOGY PROFILES
-//  1:1 with users where role = "pathology"
-// ============================================================
-
-db.createCollection("pathologyProfiles", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["userId", "labName", "licenseNumber"],
-      properties: {
-        _id:            { bsonType: "objectId" },
-        userId:         { bsonType: "objectId" },  // ref: users._id (UNIQUE)
-        labName:        { bsonType: "string" },
-        licenseNumber:  { bsonType: "string" },    // NABL / state license (UNIQUE)
-        address:        { bsonType: "string" },
-        city:           { bsonType: "string" },
-        logoUrl:        { bsonType: "string" },
-        apiKeyHash:     { bsonType: "string" },    // SHA-256 of API key, never raw
-        webhookSecret:  { bsonType: "string" },    // HMAC secret for payload verification
-        isVerified:     { bsonType: "bool" },
-        paymentPlan:    { enum: ["free", "basic", "pro"] },
-        createdAt:      { bsonType: "date" },
-        updatedAt:      { bsonType: "date" }
-      }
-    }
-  }
-});
-
-db.pathologyProfiles.createIndex({ userId: 1 }, { unique: true });
-db.pathologyProfiles.createIndex({ licenseNumber: 1 }, { unique: true });
-db.pathologyProfiles.createIndex({ city: 1 });
-db.pathologyProfiles.createIndex({ apiKeyHash: 1 }, { sparse: true });
-
-
-// ============================================================
-//  5. REPORTS
+//  4. REPORTS
 //  Core report document — one per test/upload
 // ============================================================
 
@@ -150,17 +114,16 @@ db.createCollection("reports", {
         _id:            { bsonType: "objectId" },
         patientId:      { bsonType: "objectId" },  // ref: users._id
         lvId:           { bsonType: "string" },    // Denormalized LabVault ID for quick search
-        uploadedBy:     { bsonType: "objectId" },  // ref: users._id (patient or pathology user)
-        uploadedByRole: { enum: ["patient", "pathology", "api", "doctor"] },
-        pathologyId:    { bsonType: "objectId" },  // ref: users._id (where role=pathology) (null if self-upload)
+        uploadedBy:     { bsonType: "objectId" },  // ref: users._id (patient or doctor)
+        uploadedByRole: { enum: ["patient", "doctor"] },
         reportName:     { bsonType: "string" },    // "Complete Blood Count"
-        testType:       { bsonType: "string" },    // Specific test categorization
+        testType:       { bsonType: "string" },    
         category:       { enum: ["blood", "urine", "imaging", "biopsy", "other"] },
-        fileUrl:        { bsonType: "string" },    // S3 / GCS URL
+        fileUrl:        { bsonType: "string" },    
         thumbnailUrl:   { bsonType: "string" },
-        reportDate:     { bsonType: "date" },      // date test was conducted
+        reportDate:     { bsonType: "date" },      
         status:         { enum: ["processing", "ready", "failed"] },
-        isDeleted:      { bsonType: "bool" },      // soft delete
+        isDeleted:      { bsonType: "bool" },      
         createdAt:      { bsonType: "date" },
         updatedAt:      { bsonType: "date" }
       }
@@ -169,15 +132,12 @@ db.createCollection("reports", {
 });
 
 db.reports.createIndex({ patientId: 1, reportDate: -1 });
-db.reports.createIndex({ patientId: 1, category: 1 });
-db.reports.createIndex({ pathologyId: 1, createdAt: -1 });
 db.reports.createIndex({ lvId: 1 });
 db.reports.createIndex({ status: 1 });
-db.reports.createIndex({ isDeleted: 1 });
 
 
 // ============================================================
-//  6. REPORT BIOMARKERS
+//  5. REPORT BIOMARKERS
 //  Structured extracted values — powers trend charts
 // ============================================================
 
@@ -189,15 +149,14 @@ db.createCollection("reportBiomarkers", {
       properties: {
         _id:           { bsonType: "objectId" },
         reportId:      { bsonType: "objectId" },  // ref: reports._id
-        patientId:     { bsonType: "objectId" },  // ref: users._id (denormalized)
-        biomarkerName: { bsonType: "string" },    // "HbA1c", "Creatinine", "Haemoglobin"
+        patientId:     { bsonType: "objectId" },  // ref: users._id
+        biomarkerName: { bsonType: "string" },    
         value:         { bsonType: "double" },
-        unit:          { bsonType: "string" },    // "%", "mg/dL", "g/dL"
+        unit:          { bsonType: "string" },    
         referenceMin:  { bsonType: "double" },
         referenceMax:  { bsonType: "double" },
         isAbnormal:    { bsonType: "bool" },
-        source:        { enum: ["ai_extracted", "lab_api", "manual"] },
-        testDate:      { bsonType: "date" },      // copied from report.reportDate
+        testDate:      { bsonType: "date" },      
         createdAt:     { bsonType: "date" }
       }
     }
@@ -206,11 +165,10 @@ db.createCollection("reportBiomarkers", {
 
 db.reportBiomarkers.createIndex({ reportId: 1, biomarkerName: 1 }, { unique: true });
 db.reportBiomarkers.createIndex({ patientId: 1, biomarkerName: 1, testDate: 1 });
-db.reportBiomarkers.createIndex({ isAbnormal: 1 });
 
 
 // ============================================================
-//  7. REPORT AI ANALYSIS
+//  6. REPORT AI ANALYSIS
 //  AI summaries, insights, OCR, and multilingual audio
 // ============================================================
 
@@ -222,17 +180,12 @@ db.createCollection("reportAiAnalysis", {
       properties: {
         _id:           { bsonType: "objectId" },
         reportId:      { bsonType: "objectId" },  // ref: reports._id (UNIQUE)
-        ocrText:       { bsonType: "string" },    // Raw text extracted from file
-        summaryEn:     { bsonType: "string" },    // plain-English summary for patient
-        insightsEn:    { bsonType: "string" },    // AI observations, flagged values
-        doctorBriefEn: { bsonType: "string" },    // clinical-tone brief for doctor
-        translations: {                           // summary per locale
-          bsonType: "object",
-        },
-        audioUrls: {                              // TTS audio per locale
-          bsonType: "object",
-        },
-        modelVersion:  { bsonType: "string" },   // tracker for LLM model version via inference
+        ocrText:       { bsonType: "string" },    
+        summaryEn:     { bsonType: "string" },    
+        insightsEn:    { bsonType: "string" },    
+        doctorBriefEn: { bsonType: "string" },    
+        translations:  { bsonType: "object" },
+        audioUrls:     { bsonType: "object" },
         generatedAt:   { bsonType: "date" }
       }
     }
@@ -243,7 +196,7 @@ db.reportAiAnalysis.createIndex({ reportId: 1 }, { unique: true });
 
 
 // ============================================================
-//  8. REPORT ACCESS
+//  7. REPORT ACCESS
 //  Patient grants doctor access to a specific report
 // ============================================================
 
@@ -254,13 +207,13 @@ db.createCollection("reportAccess", {
       required: ["reportId", "patientId", "doctorId", "status"],
       properties: {
         _id:          { bsonType: "objectId" },
-        reportId:     { bsonType: "objectId" },  // ref: reports._id
-        patientId:    { bsonType: "objectId" },  // ref: users._id — the grantor
-        doctorId:     { bsonType: "objectId" },  // ref: users._id — the grantee
+        reportId:     { bsonType: "objectId" },  
+        patientId:    { bsonType: "objectId" },  
+        doctorId:     { bsonType: "objectId" },  
         status:       { enum: ["pending", "approved", "revoked", "expired"] },
         accessLevel:  { enum: ["summary_only", "full_report"] },
         grantedAt:    { bsonType: "date" },
-        expiresAt:    { bsonType: "date" },      // null = no expiry
+        expiresAt:    { bsonType: "date" },      
         revokedAt:    { bsonType: "date" },
         createdAt:    { bsonType: "date" }
       }
@@ -269,196 +222,10 @@ db.createCollection("reportAccess", {
 });
 
 db.reportAccess.createIndex({ reportId: 1, doctorId: 1 }, { unique: true });
-db.reportAccess.createIndex({ patientId: 1, status: 1 });
-db.reportAccess.createIndex({ doctorId: 1, status: 1 });
-db.reportAccess.createIndex({ expiresAt: 1 }, { sparse: true });
 
 
 // ============================================================
-//  9. ACCESS REQUESTS
-//  Doctor requests access → patient approves/declines
-// ============================================================
-
-db.createCollection("accessRequests", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["doctorId", "patientId", "status", "reason"],
-      properties: {
-        _id:                  { bsonType: "objectId" },
-        doctorId:             { bsonType: "objectId" },  // ref: users._id
-        patientId:            { bsonType: "objectId" },  // ref: users._id
-        reportId:             { bsonType: "objectId" },  // ref: reports._id (null = all reports)
-        reason:               { bsonType: "string" },    // doctor states clinical reason
-        status:               { enum: ["pending", "approved", "declined", "expired"] },
-        requestedAccessLevel: { enum: ["summary_only", "full_report"] },
-        requestedExpiry:      { bsonType: "date" },      // doctor suggests; patient can override
-        respondedAt:          { bsonType: "date" },
-        expiresAt:            { bsonType: "date" },      // auto-expire
-        createdAt:            { bsonType: "date" }
-      }
-    }
-  }
-});
-
-db.accessRequests.createIndex(
-  { doctorId: 1, reportId: 1 },
-  { unique: true, partialFilterExpression: { status: "pending" } }
-);
-db.accessRequests.createIndex({ patientId: 1, status: 1 });
-db.accessRequests.createIndex({ doctorId: 1, status: 1 });
-db.accessRequests.createIndex({ expiresAt: 1 });
-
-
-// ============================================================
-//  10. EMERGENCY ACCESS LOGS
-//  ER override — append-only, fully audited
-// ============================================================
-
-db.createCollection("emergencyAccessLogs", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["doctorId", "patientId", "justification"],
-      properties: {
-        _id:                { bsonType: "objectId" },
-        doctorId:           { bsonType: "objectId" },  // ref: users._id
-        patientId:          { bsonType: "objectId" },  // ref: users._id
-        justification:      { bsonType: "string" },    // mandatory
-        accessGrantedAt:    { bsonType: "date" },
-        accessExpiresAt:    { bsonType: "date" },
-        patientNotifiedAt:  { bsonType: "date" },
-        adminReviewed:      { bsonType: "bool" },
-        ipAddress:          { bsonType: "string" },
-        createdAt:          { bsonType: "date" }       // immutable
-      }
-    }
-  }
-});
-
-db.emergencyAccessLogs.createIndex({ doctorId: 1, createdAt: -1 });
-db.emergencyAccessLogs.createIndex({ patientId: 1, createdAt: -1 });
-db.emergencyAccessLogs.createIndex({ adminReviewed: 1 });
-db.emergencyAccessLogs.createIndex({ accessExpiresAt: 1 });
-
-
-// ============================================================
-//  11. API KEYS
-//  Per-lab API key management for webhook integration
-// ============================================================
-
-db.createCollection("apiKeys", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["pathologyId", "keyHash", "label"],
-      properties: {
-        _id:         { bsonType: "objectId" },
-        pathologyId: { bsonType: "objectId" },    // ref: users._id (where role=pathology)
-        keyHash:     { bsonType: "string" },      // SHA-256 of the raw key
-        label:       { bsonType: "string" },      // "Production", "Staging"
-        scopes:      { bsonType: "array" },       
-        lastUsedAt:  { bsonType: "date" },
-        isActive:    { bsonType: "bool" },
-        expiresAt:   { bsonType: "date" },
-        createdAt:   { bsonType: "date" }
-      }
-    }
-  }
-});
-
-db.apiKeys.createIndex({ keyHash: 1 }, { unique: true });
-db.apiKeys.createIndex({ pathologyId: 1, isActive: 1 });
-
-
-// ============================================================
-//  12. WEBHOOK EVENTS
-//  Incoming events from lab systems
-// ============================================================
-
-db.createCollection("webhookEvents", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["pathologyId", "eventType", "payload", "status"],
-      properties: {
-        _id:          { bsonType: "objectId" },
-        pathologyId:  { bsonType: "objectId" },  // ref: users._id (where role=pathology)
-        eventType:    { bsonType: "string" },    // "report.created" | "report.updated" | "patient.registered"
-        payload:      { bsonType: "object" },    // raw incoming JSON
-        status:       { enum: ["received", "processing", "success", "failed"] },
-        errorMessage: { bsonType: "string" },    // null if success
-        retryCount:   { bsonType: "int" },
-        processedAt:  { bsonType: "date" },
-        createdAt:    { bsonType: "date" }
-      }
-    }
-  }
-});
-
-db.webhookEvents.createIndex({ pathologyId: 1, createdAt: -1 });
-db.webhookEvents.createIndex({ status: 1, retryCount: 1 });
-
-
-// ============================================================
-//  13. DOCTOR ANNOTATIONS
-//  Clinical notes a doctor leaves on shared reports
-// ============================================================
-
-db.createCollection("doctorAnnotations", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["reportId", "doctorId", "note"],
-      properties: {
-        _id:              { bsonType: "objectId" },
-        reportId:         { bsonType: "objectId" },  // ref: reports._id
-        doctorId:         { bsonType: "objectId" },  // ref: users._id
-        note:             { bsonType: "string" },
-        visibleToPatient: { bsonType: "bool" },      // doctor controls visibility
-        createdAt:        { bsonType: "date" },
-        updatedAt:        { bsonType: "date" }
-      }
-    }
-  }
-});
-
-db.doctorAnnotations.createIndex({ reportId: 1, doctorId: 1 });
-db.doctorAnnotations.createIndex({ doctorId: 1, createdAt: -1 });
-
-
-// ============================================================
-//  14. AUDIT LOGS
-//  Immutable — every sensitive action logged here
-// ============================================================
-
-db.createCollection("auditLogs", {
-  validator: {
-    $jsonSchema: {
-      bsonType: "object",
-      required: ["actorId", "actorRole", "action", "targetType", "targetId"],
-      properties: {
-        _id:        { bsonType: "objectId" },
-        actorId:    { bsonType: "objectId" },  // ref: users._id
-        actorRole:  { bsonType: "string" },    
-        action:     { bsonType: "string" },    
-        targetType: { bsonType: "string" },    // "report" | "patient" | "access_request" | "emergency_access"
-        targetId:   { bsonType: "objectId" },  
-        metadata:   { bsonType: "object" },    // { ip, device, extra context }
-        createdAt:  { bsonType: "date" }       // append-only
-      }
-    }
-  }
-});
-
-db.auditLogs.createIndex({ actorId: 1, createdAt: -1 });
-db.auditLogs.createIndex({ targetId: 1, targetType: 1, createdAt: -1 });
-db.auditLogs.createIndex({ action: 1, createdAt: -1 });
-
-
-// ============================================================
-//  15. NOTIFICATIONS
-//  In-app + push notification queue
+//  8. NOTIFICATIONS
 // ============================================================
 
 db.createCollection("notifications", {
@@ -468,21 +235,17 @@ db.createCollection("notifications", {
       required: ["userId", "type", "title", "body"],
       properties: {
         _id:           { bsonType: "objectId" },
-        userId:        { bsonType: "objectId" },  // ref: users._id
+        userId:        { bsonType: "objectId" },  
         type:          {
           enum: [
             "report_ready",
             "access_requested",
             "access_granted",
-            "access_revoked",
-            "emergency_override",
-            "annotation_added"
+            "access_revoked"
           ]
         },
         title:         { bsonType: "string" },
         body:          { bsonType: "string" },
-        referenceId:   { bsonType: "objectId" },  // related entity ID
-        referenceType: { bsonType: "string" },    // "report" | "access_request" | "emergency_access"
         isRead:        { bsonType: "bool" },
         createdAt:     { bsonType: "date" }
       }
@@ -491,4 +254,3 @@ db.createCollection("notifications", {
 });
 
 db.notifications.createIndex({ userId: 1, isRead: 1, createdAt: -1 });
-db.notifications.createIndex({ userId: 1, type: 1 });
