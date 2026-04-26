@@ -33,7 +33,6 @@ export default function SignupPage() {
     useEffect(() => {
         if (!loading && user) {
             const routes: Record<string, string> = {
-                pathology: '/dashboard/pathology',
                 doctor: '/dashboard/doctor',
                 patient: '/dashboard/patient',
             };
@@ -160,18 +159,10 @@ export default function SignupPage() {
                         </div>
                     )}
 
-                    {formData.role === 'patient' && (
-                        <div className="mb-6 p-4 bg-emerald-50 border-l-4 border-[#8FB9A8] text-[#4F6F6F] text-sm rounded-r-xl font-medium">
-                            <span className="font-bold block mb-1">Welcome!</span>
-                            Your patient account will be instantly active upon registration.
-                        </div>
-                    )}
-                    {(formData.role === 'doctor' || formData.role === 'pathology') && (
-                        <div className="mb-6 p-4 bg-orange-50 border-l-4 border-orange-400 text-orange-700 text-sm rounded-r-xl font-medium">
-                            <span className="font-bold block mb-1">Approval Required</span>
-                            Your account will be added as "pending" and requires admin verification.
-                        </div>
-                    )}
+                    <div className="mb-6 p-4 bg-emerald-50 border-l-4 border-[#8FB9A8] text-[#4F6F6F] text-sm rounded-r-xl font-medium">
+                        <span className="font-bold block mb-1">Instant Access</span>
+                        Your account will be activated immediately upon registration.
+                    </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="floating-label-group">
@@ -247,7 +238,6 @@ export default function SignupPage() {
                             >
                                 <option value="patient">Patient</option>
                                 <option value="doctor">Doctor</option>
-                                <option value="pathology">Pathology Administrator</option>
                             </select>
                             <label htmlFor="role">Your Role</label>
                         </div>
@@ -314,22 +304,6 @@ export default function SignupPage() {
                             </>
                         )}
 
-                        {formData.role === 'pathology' && (
-                            <>
-                                <div className="floating-label-group">
-                                    <input type="text" name="labName" id="labName" placeholder=" " required value={formData.labName} onChange={handleChange} />
-                                    <label htmlFor="labName">Lab Name</label>
-                                </div>
-                                <div className="floating-label-group">
-                                    <input type="text" name="registrationNumber" id="registrationNumber" placeholder=" " required value={formData.registrationNumber} onChange={handleChange} />
-                                    <label htmlFor="registrationNumber">Registration Number / License</label>
-                                </div>
-                                <div className="floating-label-group">
-                                    <input type="text" name="address" id="address" placeholder=" " required value={formData.address} onChange={handleChange} />
-                                    <label htmlFor="address">Full Address</label>
-                                </div>
-                            </>
-                        )}
 
                         <button
                             type="submit"

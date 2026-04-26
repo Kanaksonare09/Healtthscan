@@ -11,7 +11,7 @@ exports.signup = async (req, res) => {
         const { 
             name, email, password, role, 
             medicalLicenseNumber, hospitalName, specialization, 
-            labName, registrationNumber, address 
+            labName, registrationNumber, address, affiliatedLabId 
         } = req.body;
 
         // Check if user exists
@@ -20,12 +20,7 @@ exports.signup = async (req, res) => {
             return res.status(400).json({ message: 'User already exists' });
         }
 
-        // Set status based on role
-        const { affiliatedLabId } = req.body;
         let status = 'APPROVED';
-        if (role === 'doctor' || role === 'pathology') {
-            status = 'PENDING';
-        }
 
         // Hash password
         const salt = await bcrypt.genSalt(10);
@@ -49,12 +44,6 @@ exports.signup = async (req, res) => {
         // Establish the relational 1:1 profile
         if (role === 'patient') {
             await PatientProfile.create({ userId: user._id });
-        } else if (role === 'pathology') {
-            await PathologyProfile.create({ 
-                userId: user._id, 
-                labName: labName || name, 
-                licenseNumber: registrationNumber || `PENDING-${Date.now()}` 
-            });
         } else if (role === 'doctor') {
             const licenseCertificateUrl = req.file ? `/uploads/certificates/${req.file.filename}` : '';
             await DoctorProfile.create({ 
@@ -110,8 +99,8 @@ exports.login = async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // ROLE-BASED STATUS CHECK: Block PENDING users for Doctors and Pathology
-        if ((user.role === 'doctor' || user.role === 'pathology') && user.status !== 'APPROVED') {
+        // ROLE-BASED STATUS CHECK: Block PENDING users
+        if (user.status !== 'APPROVED') {
             return res.status(403).json({ 
                 success: false,
                 message: 'Your account is pending admin approval. You will be notified once verified.',

@@ -22,9 +22,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             return;
         }
 
-        // New structure: /dashboard/[role]/... 
-        // SuperAdmin maps to the 'admin' directory
-        const roleFolder = user.role === 'SuperAdmin' ? 'admin' : user.role;
+        const roleFolder = user.role;
         const rolePath = `/dashboard/${roleFolder}`;
         const isAllowedPath = pathname === rolePath || pathname.startsWith(rolePath + '/');
 

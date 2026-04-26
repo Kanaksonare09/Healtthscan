@@ -11,10 +11,8 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
 const accessRoutes = require('./routes/accessRoutes');
 const patientRoutes = require('./routes/patientRoutes');
-const adminRoutes = require('./routes/adminRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
-const pathologyRoutes = require('./routes/pathologyRoutes');
 
 const app = express();
 
@@ -60,12 +58,6 @@ app.use('/api/doctor', doctorRoutes);
 
 // Notification routes
 app.use('/api/notifications', notificationRoutes);
-
-// Pathology Management routes
-app.use('/api/pathology', pathologyRoutes);
-
-// SuperAdmin Management routes
-app.use('/api/admin', adminRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

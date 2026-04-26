@@ -19,10 +19,8 @@ export default function LoginPage() {
     useEffect(() => {
         if (!loading && user) {
             const routes: Record<string, string> = {
-                pathology: '/dashboard/pathology',
                 doctor: '/dashboard/doctor',
                 patient: '/dashboard/patient',
-                SuperAdmin: '/dashboard/admin',
             };
             router.replace(routes[user.role] || '/dashboard/patient');
         }
